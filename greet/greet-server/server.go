@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net"
@@ -13,15 +14,26 @@ type server struct {
 	greetpb.GreetServiceServer
 }
 
-func main() {
-	fmt.Println("Hello World")
+func (s *server) Greet(ctx context.Context, req *greetpb.GreetRequest) (*greetpb.GreetResponse, error) {
+	fmt.Printf("Greet function was invoked with %v", req)
 
+	fN := req.GetGreeting().GetFirstName()
+	lN := req.GetGreeting().GetLastName()
+
+	result := fmt.Sprintf("Hello, %v %v", fN, lN)
+
+	res := &greetpb.GreetResponse{
+		Result: result,
+	}
+
+	return res, nil
+}
+
+func main() {
 	mux, err := net.Listen("tcp", ":6543")
 	if err != nil {
 		log.Fatal("failed to listen", err)
 	}
-
-	fmt.Println(mux)
 
 	s := grpc.NewServer()
 
