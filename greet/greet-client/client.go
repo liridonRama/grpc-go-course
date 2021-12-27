@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"log"
 	"time"
 
@@ -22,6 +23,7 @@ func main() {
 	c := greetpb.NewGreetServiceClient(cc)
 
 	doUnary(c)
+	doServerStreaming(c)
 }
 
 func doUnary(c greetpb.GreetServiceClient) {
@@ -44,4 +46,34 @@ func doUnary(c greetpb.GreetServiceClient) {
 	fmt.Println(res.GetResult())
 
 	fmt.Println(time.Since(start))
+}
+
+func doServerStreaming(c greetpb.GreetServiceClient) {
+	fmt.Println("starting server streaming rpc")
+
+	req := &greetpb.GreetManyTimesRequest{
+		Greeting: &greetpb.Greeting{
+			FirstName: "Liridon",
+			LastName:  "Rama",
+		},
+	}
+
+	rStream, err := c.GreetManyTimes(context.Background(), req)
+	if err != nil {
+		log.Fatalln("error while retrieving stream:", err)
+	}
+
+	for {
+		msg, err := rStream.Recv()
+		if err == io.EOF {
+			break
+		}
+
+		if err != nil {
+			log.Fatalln("error while retrieving messages from stream:", err)
+		}
+
+		log.Printf("response from GreetManyTimes: %v\n", msg.GetResult())
+	}
+
 }

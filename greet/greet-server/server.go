@@ -5,20 +5,21 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"strconv"
+	"time"
 
 	"github.com/liridonrama/grpc-go-course/greet/greetpb"
 	"google.golang.org/grpc"
 )
 
 type server struct {
-	greetpb.GreetServiceServer
+	greetpb.UnimplementedGreetServiceServer
 }
 
 func (s *server) Greet(ctx context.Context, req *greetpb.GreetRequest) (*greetpb.GreetResponse, error) {
 	fmt.Printf("Greet function was invoked with %v", req)
 
-	fN := req.GetGreeting().GetFirstName()
-	lN := req.GetGreeting().GetLastName()
+	fN, lN := req.GetGreeting().GetFirstName(), req.GetGreeting().GetLastName()
 
 	result := fmt.Sprintf("Hello, %v %v", fN, lN)
 
@@ -27,6 +28,23 @@ func (s *server) Greet(ctx context.Context, req *greetpb.GreetRequest) (*greetpb
 	}
 
 	return res, nil
+}
+
+func (s *server) GreetManyTimes(req *greetpb.GreetManyTimesRequest, stream greetpb.GreetService_GreetManyTimesServer) error {
+	fmt.Println("GreetManyTimesFunction was invoked:", req)
+
+	fN := req.Greeting.GetFirstName()
+
+	for i := 0; i < 10; i++ {
+		res := &greetpb.GreetManyTimesResponse{
+			Result: fmt.Sprintf("Hello %v number %v", fN, strconv.Itoa(i+1)),
+		}
+
+		stream.Send(res)
+		time.Sleep(time.Second)
+	}
+
+	return nil
 }
 
 func main() {
