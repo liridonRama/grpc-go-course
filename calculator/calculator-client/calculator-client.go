@@ -3,9 +3,8 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"log"
-	"math/rand"
-	"sync"
 	"time"
 
 	"github.com/liridonrama/grpc-go-course/calculator/calculatorpb"
@@ -13,11 +12,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-const ITERATIONS = 1
-
 func main() {
-	wg := sync.WaitGroup{}
-
 	cc, err := grpc.Dial("localhost:6543", grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		log.Fatalf("could not connect %v", err)
@@ -25,20 +20,17 @@ func main() {
 
 	defer cc.Close()
 
-	c := calculatorpb.NewSumServiceClient(cc)
+	c := calculatorpb.NewCalculatorServiceClient(cc)
 
-	start := time.Now()
-	for i := 0; i < ITERATIONS; i++ {
-		wg.Add(1)
-		go getResult([]float64{rand.Float64()}, c, &wg)
-	}
+	doUnary(c)
 
-	wg.Wait()
-
-	fmt.Println(time.Since(start))
+	doServerStream(c)
 }
 
-func getResult(values []float64, c calculatorpb.SumServiceClient, wg *sync.WaitGroup) {
+func doUnary(c calculatorpb.CalculatorServiceClient) {
+
+	start := time.Now()
+
 	res, err := c.Sum(context.Background(), &calculatorpb.SumRequest{
 		Sum: &calculatorpb.Sum{
 			Values: []float64{1.1, 1.1},
@@ -50,5 +42,27 @@ func getResult(values []float64, c calculatorpb.SumServiceClient, wg *sync.WaitG
 
 	fmt.Println(res.GetResult())
 
-	wg.Done()
+	fmt.Println(time.Since(start))
+}
+
+func doServerStream(c calculatorpb.CalculatorServiceClient) {
+	stream, err := c.PrimeNumberDecomposition(context.Background(), &calculatorpb.PrimeNumberDecompositionRequest{
+		Number: 1902,
+	})
+	if err != nil {
+		log.Fatalln("error while trying to retrieve stream:", err)
+	}
+
+	for {
+		res, err := stream.Recv()
+		if err == io.EOF {
+			// reached end
+			break
+		}
+		if err != nil {
+			log.Fatalln("error while trying to retrieve stream:", err)
+		}
+
+		fmt.Println("Received prime number:", res.GetPrimeNumber())
+	}
 }

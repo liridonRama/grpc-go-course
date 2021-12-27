@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net"
 
@@ -10,7 +11,7 @@ import (
 )
 
 type server struct {
-	calculatorpb.UnimplementedSumServiceServer
+	calculatorpb.UnimplementedCalculatorServiceServer
 }
 
 func (s *server) Sum(ctx context.Context, req *calculatorpb.SumRequest) (*calculatorpb.SumResponse, error) {
@@ -29,6 +30,30 @@ func (s *server) Sum(ctx context.Context, req *calculatorpb.SumRequest) (*calcul
 	return sR, nil
 }
 
+func (s *server) PrimeNumberDecomposition(req *calculatorpb.PrimeNumberDecompositionRequest, stream calculatorpb.CalculatorService_PrimeNumberDecompositionServer) error {
+	number := req.GetNumber()
+	var k int32 = 2
+
+	for number > 1 {
+		if number%k == 0 {
+			fmt.Println("this is a factor:", number)
+			err := stream.Send(&calculatorpb.PrimeNumberDecompositionResponse{
+				PrimeNumber: k,
+			})
+			if err != nil {
+				fmt.Println("error while trying to extract prime numbers:", err)
+				return err
+			}
+
+			number /= k
+		} else {
+			k++
+		}
+	}
+
+	return nil
+}
+
 func main() {
 	mux, err := net.Listen("tcp", ":6543")
 	if err != nil {
@@ -37,7 +62,7 @@ func main() {
 
 	s := grpc.NewServer()
 
-	calculatorpb.RegisterSumServiceServer(s, &server{})
+	calculatorpb.RegisterCalculatorServiceServer(s, &server{})
 
 	err = s.Serve(mux)
 	if err != nil {
