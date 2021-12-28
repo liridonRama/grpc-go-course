@@ -22,9 +22,9 @@ func main() {
 
 	c := greetpb.NewGreetServiceClient(cc)
 
-	// doUnary(c)
-	// doServerStreaming(c)
-	// doClientStreaming(c)
+	doUnary(c)
+	doServerStreaming(c)
+	doClientStreaming(c)
 	doBiDiStreaming(c)
 }
 
