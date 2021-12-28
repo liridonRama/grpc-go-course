@@ -24,6 +24,7 @@ func main() {
 
 	doUnary(c)
 	doServerStreaming(c)
+	doClientStreaming(c)
 }
 
 func doUnary(c greetpb.GreetServiceClient) {
@@ -46,6 +47,39 @@ func doUnary(c greetpb.GreetServiceClient) {
 	fmt.Println(res.GetResult())
 
 	fmt.Println(time.Since(start))
+}
+
+func doClientStreaming(c greetpb.GreetServiceClient) {
+	fmt.Println("starting client streaming rpc")
+
+	stream, err := c.LongGreet(context.Background())
+	if err != nil {
+		log.Fatalln("error while calling long greet")
+	}
+
+	requests := []*greetpb.LongGreetRequest{
+		{Greeting: &greetpb.Greeting{FirstName: "Liri"}},
+		{Greeting: &greetpb.Greeting{FirstName: "Hans"}},
+		{Greeting: &greetpb.Greeting{FirstName: "Ueli"}},
+		{Greeting: &greetpb.Greeting{FirstName: "Peter"}},
+		{Greeting: &greetpb.Greeting{FirstName: "John"}},
+		{Greeting: &greetpb.Greeting{FirstName: "Steve"}},
+		{Greeting: &greetpb.Greeting{FirstName: "Sage"}},
+	}
+
+	for _, req := range requests {
+		fmt.Println("sending request", req)
+		stream.Send(req)
+
+		time.Sleep(time.Second)
+	}
+
+	res, err := stream.CloseAndRecv()
+	if err != nil {
+		log.Fatalln("error while receiving long greet")
+	}
+
+	fmt.Println("Long Greet Response:", res.GetResult())
 }
 
 func doServerStreaming(c greetpb.GreetServiceClient) {
