@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"log"
 	"net"
 
@@ -50,6 +51,32 @@ func (s *server) PrimeNumberDecomposition(req *calculatorpb.PrimeNumberDecomposi
 			k++
 		}
 	}
+
+	return nil
+}
+
+func (s *server) ComputeAverage(stream calculatorpb.CalculatorService_ComputeAverageServer) error {
+	var num float64
+	msgCount := 0
+
+	for {
+		msg, err := stream.Recv()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			log.Fatalln("Error while trying to read from stream:", err)
+		}
+
+		num += msg.GetNumber()
+		msgCount++
+	}
+
+	res := &calculatorpb.ComputeAverageResponse{
+		Result: num / float64(msgCount),
+	}
+
+	stream.SendAndClose(res)
 
 	return nil
 }
