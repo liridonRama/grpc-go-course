@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"sync"
 	"time"
 
 	"github.com/liridonrama/grpc-go-course/calculator/calculatorpb"
@@ -22,11 +23,13 @@ func main() {
 
 	c := calculatorpb.NewCalculatorServiceClient(cc)
 
-	doUnary(c)
+	// doUnary(c)
 
-	doServerStream(c)
+	// doServerStream(c)
 
-	doClientStream(c)
+	// doClientStream(c)
+
+	doBiDiStream(c)
 }
 
 func doUnary(c calculatorpb.CalculatorServiceClient) {
@@ -90,4 +93,46 @@ func doClientStream(c calculatorpb.CalculatorServiceClient) {
 
 	fmt.Println("Res received from server:", res.GetResult())
 
+}
+
+func doBiDiStream(c calculatorpb.CalculatorServiceClient) {
+	wG := sync.WaitGroup{}
+	wSream, err := c.FindMaximum(context.Background())
+	if err != nil {
+		log.Fatalln("Error while trying to start stream")
+	}
+
+	nums := []int32{100, 20, 400, -20, 1440, 12, 1660, 12345}
+
+	wG.Add(1)
+	go func() {
+
+		for _, num := range nums {
+			wSream.Send(&calculatorpb.FindMaximumRequest{
+				Number: num,
+			})
+		}
+
+		wSream.CloseSend()
+		wG.Done()
+	}()
+
+	wG.Add(1)
+	go func() {
+		for {
+			res, err := wSream.Recv()
+			if err == io.EOF {
+				break
+			}
+			if err != nil {
+				log.Fatalln("Error while trying to start stream")
+			}
+
+			fmt.Println(res.GetResult())
+		}
+
+		wG.Done()
+	}()
+
+	wG.Wait()
 }

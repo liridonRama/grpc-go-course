@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 	"net"
+	"time"
 
 	"github.com/liridonrama/grpc-go-course/calculator/calculatorpb"
 	"google.golang.org/grpc"
@@ -77,6 +78,36 @@ func (s *server) ComputeAverage(stream calculatorpb.CalculatorService_ComputeAve
 	}
 
 	stream.SendAndClose(res)
+
+	return nil
+}
+
+func (*server) FindMaximum(stream calculatorpb.CalculatorService_FindMaximumServer) error {
+	var max int32
+
+	for {
+		req, err := stream.Recv()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			log.Fatalln("Error while trying to read from stream:", err)
+		}
+
+		fmt.Println("FindMaximum — Message received:", req.GetNumber())
+
+		num := req.GetNumber()
+
+		if num > max {
+			max = num
+		}
+
+		stream.Send(&calculatorpb.FindMaximumResponse{
+			Result: max,
+		})
+
+		time.Sleep(time.Second)
+	}
 
 	return nil
 }
