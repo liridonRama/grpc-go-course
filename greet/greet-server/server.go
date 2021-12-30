@@ -11,6 +11,8 @@ import (
 
 	"github.com/liridonrama/grpc-go-course/greet/greetpb"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type server struct {
@@ -95,10 +97,34 @@ func (*server) GreetEveryone(stream greetpb.GreetService_GreetEveryoneServer) er
 	}
 }
 
+func (s *server) GreetWithDeadline(ctx context.Context, req *greetpb.GreetWithDeadlineRequest) (*greetpb.GreetWithDeadlineResponse, error) {
+	fmt.Println("GreetWithDeadline function was invoked with:", req)
+
+	for i := 0; i < 3; i++ {
+		if ctx.Err() == context.Canceled {
+			fmt.Println("Client canceled request")
+
+			return nil, status.Error(codes.Canceled, "the client canceled the request")
+		}
+
+		time.Sleep(time.Second)
+	}
+
+	fN, lN := req.GetGreeting().GetFirstName(), req.GetGreeting().GetLastName()
+
+	result := fmt.Sprintf("Hello, %v %v", fN, lN)
+
+	res := &greetpb.GreetWithDeadlineResponse{
+		Result: result,
+	}
+
+	return res, nil
+}
+
 func main() {
 	mux, err := net.Listen("tcp", ":6543")
 	if err != nil {
-		log.Fatal("failed to listen", err)
+		log.Fatalln("failed to listen", err)
 	}
 
 	s := grpc.NewServer()
@@ -107,6 +133,6 @@ func main() {
 
 	err = s.Serve(mux)
 	if err != nil {
-		log.Fatal("failed to listen", err)
+		log.Fatalln("failed to listen", err)
 	}
 }
