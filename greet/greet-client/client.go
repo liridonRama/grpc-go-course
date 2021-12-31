@@ -5,17 +5,40 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"os"
+	"strconv"
 	"time"
 
 	"github.com/liridonrama/grpc-go-course/greet/greetpb"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
 )
 
 func main() {
-	cc, err := grpc.Dial("localhost:6543", grpc.WithTransportCredentials(insecure.NewCredentials()))
+	var withCreds grpc.DialOption
+
+	tls, err := strconv.ParseBool(os.Getenv("TLS_ENABLED"))
+	if err != nil {
+		tls = false
+	}
+
+	fmt.Println(tls)
+
+	if tls {
+		certFile := "ssl/ca.crt"
+		creds, err := credentials.NewClientTLSFromFile(certFile, "")
+		if err != nil {
+			log.Fatalf("could not connect %v", err)
+		}
+		withCreds = grpc.WithTransportCredentials(creds)
+	} else {
+		withCreds = grpc.WithTransportCredentials(insecure.NewCredentials())
+	}
+
+	cc, err := grpc.Dial("localhost:6543", withCreds)
 	if err != nil {
 		log.Fatalf("could not connect %v", err)
 	}
@@ -24,13 +47,12 @@ func main() {
 
 	c := greetpb.NewGreetServiceClient(cc)
 
-	// doUnary(c)
+	doUnary(c)
 	// doServerStreaming(c)
 	// doClientStreaming(c)
 	// doBiDiStreaming(c)
-
-	doUnaryWithDeadline(c, 5*time.Second)
-	doUnaryWithDeadline(c, 1*time.Second)
+	// doUnaryWithDeadline(c, 5*time.Second)
+	// doUnaryWithDeadline(c, 1*time.Second)
 }
 
 func doUnary(c greetpb.GreetServiceClient) {

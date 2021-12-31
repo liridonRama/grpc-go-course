@@ -12,6 +12,7 @@ import (
 	"github.com/liridonrama/grpc-go-course/calculator/calculatorpb"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/reflection"
 	"google.golang.org/grpc/status"
 )
 
@@ -137,6 +138,8 @@ func main() {
 	s := grpc.NewServer()
 
 	calculatorpb.RegisterCalculatorServiceServer(s, &server{})
+
+	reflection.Register(s)
 
 	err = s.Serve(mux)
 	if err != nil {
