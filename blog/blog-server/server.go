@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net"
 	"os"
@@ -44,12 +45,7 @@ func (*server) CreateBlog(ctx context.Context, req *blogpb.CreateBlogRequest) (*
 	}
 
 	res := &blogpb.CreateBlogResponse{
-		Blog: &blogpb.Blog{
-			Id:       data.ID.Hex(),
-			AuthorId: data.AuthorID.Hex(),
-			Title:    data.Title,
-			Content:  data.Content,
-		},
+		Blog: blogItemToBlogpb(data),
 	}
 
 	return res, nil
@@ -72,7 +68,7 @@ func (*server) ReadBlog(ctx context.Context, req *blogpb.ReadBlogRequest) (*blog
 		return nil, status.Errorf(codes.NotFound, "Blog with the id: %v not found", id)
 	}
 
-	var blog blogpb.Blog
+	var blog BlogItem
 
 	err = result.Decode(&blog)
 	if err != nil {
@@ -80,15 +76,133 @@ func (*server) ReadBlog(ctx context.Context, req *blogpb.ReadBlogRequest) (*blog
 	}
 
 	res := &blogpb.ReadBlogResponse{
-		Blog: &blogpb.Blog{
-			Id:       blog.Id,
-			AuthorId: blog.AuthorId,
-			Title:    blog.Title,
-			Content:  blog.Content,
-		},
+		Blog: blogItemToBlogpb(blog),
 	}
 
 	return res, nil
+}
+func (*server) UpdateBlog(ctx context.Context, req *blogpb.UpdateBlogRequest) (*blogpb.UpdateBlogResponse, error) {
+	log.Println("Update Blog Request RPC Call")
+
+	blog := req.GetBlog()
+
+	blogId, err := primitive.ObjectIDFromHex(blog.GetId())
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "Can not parse ID from string to objectId")
+	}
+
+	data := BlogItem{}
+
+	if blog.GetAuthorId() != "" {
+		authorId, err := primitive.ObjectIDFromHex(blog.GetAuthorId())
+		if err != nil {
+			return nil, err
+		}
+
+		data.AuthorID = authorId
+	}
+
+	if blog.GetTitle() != "" {
+		data.Title = blog.GetTitle()
+	}
+
+	if blog.GetContent() != "" {
+		data.Content = blog.GetContent()
+	}
+
+	after := options.After
+	upsert := true
+	opt := &options.FindOneAndUpdateOptions{
+		ReturnDocument: &after,
+		Upsert:         &upsert,
+	}
+
+	result := collection.FindOneAndUpdate(ctx, primitive.M{
+		"_id": blogId,
+	}, primitive.M{
+		"$set": data,
+	}, opt)
+	if result.Err() != nil {
+		if result.Err() == mongo.ErrNoDocuments {
+			return nil, status.Errorf(codes.NotFound, "Blog with the id: %v not found", blog.GetId())
+		}
+
+		return nil, err
+	}
+
+	var blogRes BlogItem
+
+	err = result.Decode(&blogRes)
+	if err != nil {
+		return nil, err
+	}
+
+	res := &blogpb.UpdateBlogResponse{
+		Blog: blogItemToBlogpb(blogRes),
+	}
+
+	return res, nil
+}
+
+func (*server) DeleteBlog(ctx context.Context, req *blogpb.DeleteBlogRequest) (*blogpb.DeleteBlogResponse, error) {
+	log.Println("Read Blog Request RPC Call")
+
+	id := req.GetBlogId()
+
+	blogId, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "the provided id: %v is not a objectid string", id)
+	}
+
+	result := collection.FindOneAndDelete(ctx, primitive.M{
+		"_id": blogId,
+	})
+
+	if result.Err() == mongo.ErrNoDocuments {
+		return nil, status.Errorf(codes.NotFound, "Blog with the id: %v not found", id)
+	}
+
+	res := &blogpb.DeleteBlogResponse{
+		BlogId: id,
+	}
+
+	return res, nil
+}
+
+func (*server) ListBlog(_ *blogpb.ListBlogRequest, wStream blogpb.BlogService_ListBlogServer) error {
+	var blog BlogItem
+
+	blogCursor, err := collection.Find(context.Background(), primitive.M{})
+	if err != nil {
+		return status.Errorf(codes.Internal, fmt.Sprintf("error while trying to retrieve cursor: %v", err))
+	}
+	defer blogCursor.Close(context.Background())
+
+	for blogCursor.Next(context.Background()) {
+		err = blogCursor.Decode(&blog)
+		if err != nil {
+			return status.Errorf(codes.Internal, fmt.Sprintf("error while decoding data from MongoDB: %v", err))
+		}
+
+		wStream.Send(&blogpb.ListBlogResponse{
+			Blog: blogItemToBlogpb(blog),
+		})
+	}
+
+	if blogCursor.Err() != nil {
+		return status.Errorf(codes.Internal, fmt.Sprintf("unknown internal error: %v", blogCursor.Err()))
+	}
+
+	return nil
+}
+
+func blogItemToBlogpb(bI BlogItem) *blogpb.Blog {
+	return &blogpb.Blog{
+		Id:       bI.ID.Hex(),
+		AuthorId: bI.AuthorID.Hex(),
+		Title:    bI.Title,
+		Content:  bI.Content,
+	}
 }
 
 type BlogItem struct {
